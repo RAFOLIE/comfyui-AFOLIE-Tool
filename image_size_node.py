@@ -37,6 +37,7 @@ class AFOLIE图像像素缩放:
     """
     图像像素缩放节点
     通过指定宽度和高度来调整图像大小
+    支持透明背景图像（自动保留并缩放透明通道）
     """
     
     def __init__(self):
@@ -61,60 +62,118 @@ class AFOLIE图像像素缩放:
                 }),
                 "采样方法": (SAMPLING_METHODS,),
             },
+            "optional": {
+                "mask": ("MASK",),
+            }
         }
 
-    RETURN_TYPES = ("IMAGE",)
+    RETURN_TYPES = ("IMAGE", "MASK")
+    RETURN_NAMES = ("图像", "遮罩")
     FUNCTION = "resize_image"
     CATEGORY = "AFOLIE/图像"
 
-    def resize_image(self, 图像, 宽度, 高度, 采样方法):
+    def resize_image(self, 图像, 宽度, 高度, 采样方法, mask=None):
         """
-        使用像素值调整图像大小
+        使用像素值调整图像大小，支持透明背景
+        
+        ComfyUI 中透明背景通过 IMAGE(3通道RGB) + MASK(遮罩) 分开传递。
+        将输出的「图像」和「遮罩」分别连到保存图像节点的对应输入即可保存带透明的PNG。
         
         Args:
-            图像: 输入图像张量
+            图像: 输入图像张量 [B, H, W, 3]
             宽度: 目标宽度（像素）
             高度: 目标高度（像素）
             采样方法: 重新采样算法
+            mask: 可选的透明遮罩张量 [B, H, W]
         """
         batch_size = 图像.shape[0]
+        channels = 图像.shape[3] if 图像.dim() == 4 else 3
         target_width = 宽度
         target_height = 高度
         
+        # 判断是否有透明通道需要处理
+        has_alpha = mask is not None or channels == 4
+        
+        # 将重采样方法映射到PIL滤镜
+        resample_map = {
+            "两次立方(平滑渐变)": Image.BICUBIC,
+            "保留细节(扩大)": Image.LANCZOS,
+            "保留细节2.0": Image.LANCZOS,
+            "两次立方(较平滑)(扩大)": Image.BICUBIC,
+            "两次立方(较锐利)(缩减)": Image.BICUBIC,
+            "邻近(硬边缘)": Image.NEAREST,
+            "两次线性": Image.BILINEAR
+        }
+        pil_filter = resample_map.get(采样方法, Image.BICUBIC)
+        
+        # 处理遮罩维度
+        if mask is not None:
+            if mask.dim() == 2:
+                mask = mask.unsqueeze(0)
+            if mask.shape[0] == 1 and batch_size > 1:
+                mask = mask.expand(batch_size, -1, -1)
+        
+        # 如果输入图像是4通道，提取alpha作为mask
+        if channels == 4 and mask is None:
+            # 从4通道图像中提取alpha通道作为mask
+            mask = 图像[:, :, :, 3]  # [B, H, W]
+        
         # 处理批次中的每个图像
         resized_images = []
+        resized_masks = []
         
         for i in range(batch_size):
             img = 图像[i]
             
+            # 只取RGB通道
+            if channels == 4:
+                rgb_tensor = img[:, :, :3]
+            else:
+                rgb_tensor = img
+            
             # 转换为PIL进行高质量重采样
-            pil_img = tensor2pil(img)
-            
-            # 将重采样方法映射到PIL滤镜
-            resample_map = {
-                "两次立方(平滑渐变)": Image.BICUBIC,
-                "保留细节(扩大)": Image.LANCZOS,
-                "保留细节2.0": Image.LANCZOS,
-                "两次立方(较平滑)(扩大)": Image.BICUBIC,
-                "两次立方(较锐利)(缩减)": Image.BICUBIC,
-                "邻近(硬边缘)": Image.NEAREST,
-                "两次线性": Image.BILINEAR
-            }
-            
-            pil_filter = resample_map.get(采样方法, Image.BICUBIC)
+            pil_img = Image.fromarray(
+                np.clip(255. * rgb_tensor.cpu().numpy(), 0, 255).astype(np.uint8), 
+                mode='RGB'
+            )
             
             # 使用PIL调整大小
             resized_pil = pil_img.resize((target_width, target_height), pil_filter)
             
-            # 转换回张量
-            resized_tensor = pil2tensor(resized_pil)
+            # 转换回张量 (3通道RGB)
+            resized_tensor = torch.from_numpy(
+                np.array(resized_pil).astype(np.float32) / 255.0
+            ).unsqueeze(0)
             
             resized_images.append(resized_tensor)
+            
+            # 缩放遮罩
+            if mask is not None:
+                m = mask[i] if i < mask.shape[0] else mask[0]
+                pil_mask = Image.fromarray(
+                    np.clip(255. * m.cpu().numpy(), 0, 255).astype(np.uint8),
+                    mode='L'
+                )
+                resized_mask_pil = pil_mask.resize((target_width, target_height), Image.NEAREST)
+                resized_mask_tensor = torch.from_numpy(
+                    np.array(resized_mask_pil).astype(np.float32) / 255.0
+                )
+                resized_masks.append(resized_mask_tensor)
         
         # 将所有图像堆叠回批次
         result = torch.cat(resized_images, dim=0)
         
-        return (result,)
+        # 处理遮罩输出
+        if len(resized_masks) > 0:
+            mask_result = torch.stack(resized_masks, dim=0)
+        else:
+            # 没有遮罩时，返回全白遮罩（完全不透明）
+            mask_result = torch.ones(
+                batch_size, target_height, target_width,
+                dtype=torch.float32
+            )
+        
+        return (result, mask_result)
 
 
 class AFOLIE图像倍数缩放:

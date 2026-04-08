@@ -40,7 +40,7 @@ class AFOLIEInput批次图像:
     RETURN_TYPES = ("IMAGE",)
     RETURN_NAMES = ("图像",)
     FUNCTION = "load_images"
-    CATEGORY = "AFOLIE/输入"
+    CATEGORY = "AFOLIE/input"
     OUTPUT_IS_LIST = (True,)
 
     def load_images(self, 路径, 文件格式="all"):
@@ -167,7 +167,7 @@ class AFOLIEInput批次图像像素:
     RETURN_TYPES = ("IMAGE",)
     RETURN_NAMES = ("图像",)
     FUNCTION = "load_images"
-    CATEGORY = "AFOLIE/输入"
+    CATEGORY = "AFOLIE/input"
     OUTPUT_IS_LIST = (True,)
 
     def load_images(self, 路径, 文件格式="all", 统一宽度=512, 统一高度=512, 采样方法="保留细节(Lanczos)"):
@@ -303,7 +303,7 @@ class AFOLIEInput批次图像倍数:
     RETURN_TYPES = ("IMAGE",)
     RETURN_NAMES = ("图像",)
     FUNCTION = "load_images"
-    CATEGORY = "AFOLIE/输入"
+    CATEGORY = "AFOLIE/input"
     OUTPUT_IS_LIST = (True,)
 
     def load_images(self, 路径, 文件格式="all", 倍数=1.0, 采样方法="保留细节(Lanczos)"):

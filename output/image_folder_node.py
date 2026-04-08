@@ -82,7 +82,7 @@ class AFOLIE图像文件夹:
     RETURN_NAMES = ("图像", "保存路径")
     FUNCTION = "save_images"
     OUTPUT_NODE = True
-    CATEGORY = "AFOLIE/输出"
+    CATEGORY = "AFOLIE/output"
 
     def save_images(self, 图像, 文件夹路径, 文件名前缀="AFOLIE", 文件格式="png", 保存元数据=True):
         """
