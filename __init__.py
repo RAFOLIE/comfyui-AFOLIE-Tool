@@ -1,33 +1,57 @@
 """
-AFOLIE Image Size - ComfyUI Custom Node
-Photoshop-like image resizing functionality
+AFOLIE Tool - ComfyUI Custom Nodes (V3 API)
 """
 
-from .image_size_node import NODE_CLASS_MAPPINGS as IMAGE_SIZE_MAPPINGS
-from .image_size_node import NODE_DISPLAY_NAME_MAPPINGS as IMAGE_SIZE_DISPLAY_MAPPINGS
-from .output import NODE_CLASS_MAPPINGS as OUTPUT_MAPPINGS
-from .output import NODE_DISPLAY_NAME_MAPPINGS as OUTPUT_DISPLAY_MAPPINGS
-from .input import NODE_CLASS_MAPPINGS as INPUT_MAPPINGS
-from .input import NODE_DISPLAY_NAME_MAPPINGS as INPUT_DISPLAY_MAPPINGS
-from .background_transparent import NODE_CLASS_MAPPINGS as BG_TRANSPARENT_MAPPINGS
-from .background_transparent import NODE_DISPLAY_NAME_MAPPINGS as BG_TRANSPARENT_DISPLAY_MAPPINGS
-# Merge all node mappings
-NODE_CLASS_MAPPINGS = {
-    **IMAGE_SIZE_MAPPINGS,
-    **OUTPUT_MAPPINGS,
-    **INPUT_MAPPINGS,
-    **BG_TRANSPARENT_MAPPINGS,
-}
+from comfy_api.latest import ComfyExtension, io
+from typing_extensions import override
 
-NODE_DISPLAY_NAME_MAPPINGS = {
-    **IMAGE_SIZE_DISPLAY_MAPPINGS,
-    **OUTPUT_DISPLAY_MAPPINGS,
-    **INPUT_DISPLAY_MAPPINGS,
-    **BG_TRANSPARENT_DISPLAY_MAPPINGS,
-}
+from .image_size_node import (
+    AFOLIEImagePixelResize,
+    AFOLIEImageScaleResize,
+    AFOLIEImageGridCrop,
+    AFOLIEPixelAlign,
+)
+from .background_transparent import AFOLIEBackgroundTransparent
+from .input.batch_image_loader import (
+    AFOLIEInputBatchImages,
+    AFOLIEInputBatchImagePixels,
+    AFOLIEInputBatchImageScale,
+)
+from .input.image_loader import AFOLIELoadImage, AFOLIEBrowseImage
+from .output.image_folder_node import AFOLIEImageFolder
+from .output.transparent_image_node import AFOLIETransparentPreview, AFOLIETransparentSave
+from .dynamic_text_node import AFOLIEDynamicText
 
 # Web directory for frontend JavaScript files
 WEB_DIRECTORY = "./web"
+__all__ = ["WEB_DIRECTORY"]
+__version__ = "2.0.0"
 
-__all__ = ['NODE_CLASS_MAPPINGS', 'NODE_DISPLAY_NAME_MAPPINGS', 'WEB_DIRECTORY']
-__version__ = "1.0.0"
+
+class AFOLIEExtension(ComfyExtension):
+    @override
+    async def get_node_list(self) -> list[type[io.ComfyNode]]:
+        return [
+            # 图像处理
+            AFOLIEImagePixelResize,
+            AFOLIEImageScaleResize,
+            AFOLIEImageGridCrop,
+            AFOLIEPixelAlign,
+            AFOLIEBackgroundTransparent,
+            # 输入
+            AFOLIEInputBatchImages,
+            AFOLIEInputBatchImagePixels,
+            AFOLIEInputBatchImageScale,
+            AFOLIELoadImage,
+            # 输出
+            AFOLIEBrowseImage,
+            AFOLIEImageFolder,
+            AFOLIETransparentPreview,
+            AFOLIETransparentSave,
+            # 文本
+            AFOLIEDynamicText,
+        ]
+
+
+async def comfy_entrypoint() -> AFOLIEExtension:
+    return AFOLIEExtension()
